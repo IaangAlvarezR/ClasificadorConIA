@@ -54,8 +54,8 @@ from PIL import Image
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
-MODEL_PATH = Path("modelo_residuos.keras")
-LABELS_PATH = Path("labels.json")
+MODEL_PATH = Path("python/modelo_residuos.keras")
+LABELS_PATH = Path("python/labels.json")
 
 app = FastAPI(title="EcoClasifica IA API")
 
