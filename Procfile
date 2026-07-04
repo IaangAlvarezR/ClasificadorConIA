@@ -1,1 +1,1 @@
-web: python python/clasificacion_residuos_ejemplo.py
+web: uvicorn python.clasificacion_residuos_ejemplo:app --host 0.0.0.0 --port $PORT
