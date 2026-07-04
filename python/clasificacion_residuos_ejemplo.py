@@ -30,18 +30,19 @@ Uso recomendado:
 
    python clasificacion_residuos_ejemplo.py predict --image ./prueba.jpg
 
-5. Levanta backend para Railway:
+5. Levanta backend para Railway/Render:
 
    uvicorn clasificacion_residuos_ejemplo:app --host 0.0.0.0 --port 8000
 
 El frontend actual puede consumir este backend porque expone POST /predict.
-En Vercel configura VITE_API_URL con la URL publica de Railway.
+En Vercel configura VITE_API_URL con la URL publica de tu servidor.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -50,15 +51,14 @@ import tensorflow as tf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
-import os
-
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
+
 # Obtener el directorio actual donde se encuentra este archivo de Python
 BASE_DIR = Path(__file__).resolve().parent
 
-# Configurar las rutas absolutas apuntando directamente al archivo en la misma carpeta
+# Configurar las rutas absolutas apuntando directamente al archivo en la misma carpeta como cadenas de texto (str)
 MODEL_PATH = os.path.join(BASE_DIR, "modelo_residuos.keras")
 LABELS_PATH = os.path.join(BASE_DIR, "labels.json")
 
@@ -72,7 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- NUEVA LÓGICA DE CARGA GLOBAL ---
+# --- LÓGICA DE CARGA GLOBAL DEL MODELO ---
 MODELO_GLOBAL = None
 ETIQUETAS_GLOBAL = None
 
@@ -80,10 +80,14 @@ ETIQUETAS_GLOBAL = None
 def load_model_on_startup():
     """Carga el modelo de IA una sola vez cuando el servidor se enciende"""
     global MODELO_GLOBAL, ETIQUETAS_GLOBAL
-    if MODEL_PATH.exists() and LABELS_PATH.exists():
+    
+    if os.path.exists(MODEL_PATH) and os.path.exists(LABELS_PATH):
         print("Cargando modelo de IA en memoria...")
         MODELO_GLOBAL = tf.keras.models.load_model(MODEL_PATH)
-        ETIQUETAS_GLOBAL = json.loads(LABELS_PATH.read_text(encoding="utf-8"))
+        
+        with open(LABELS_PATH, "r", encoding="utf-8") as f:
+            ETIQUETAS_GLOBAL = json.load(f)
+            
         print("¡Modelo cargado exitosamente!")
     else:
         print("Advertencia: No se encontraron los archivos del modelo en la ruta especificada.")
@@ -172,12 +176,14 @@ def train(data_dir: Path, epochs: int) -> None:
 
     model.fit(train_ds, validation_data=val_ds, epochs=epochs, callbacks=callbacks)
 
-    if not MODEL_PATH.exists():
+    if not os.path.exists(MODEL_PATH):
         model.save(MODEL_PATH)
 
-    LABELS_PATH.write_text(json.dumps(class_names, indent=2), encoding="utf-8")
-    print(f"Modelo guardado en: {MODEL_PATH.resolve()}")
-    print(f"Etiquetas guardadas en: {LABELS_PATH.resolve()}")
+    with open(LABELS_PATH, "w", encoding="utf-8") as f:
+        json.dump(class_names, f, indent=2)
+        
+    print(f"Modelo guardado en: {os.path.abspath(MODEL_PATH)}")
+    print(f"Etiquetas guardadas en: {os.path.abspath(LABELS_PATH)}")
 
 
 def preprocess_image(image: Image.Image) -> np.ndarray:
@@ -250,19 +256,16 @@ def parse_args() -> argparse.Namespace | None:
     return parser.parse_args()
 
 
-# ... (Todo el resto del código optimizado que te pasé arriba se mantiene exactamente igual)
-
 if __name__ == "__main__":
     args = parse_args()
 
-    # Si NO se pasaron argumentos de consola (es decir, lo está ejecutando Railway)
+    # Si NO se pasaron argumentos de consola (es decir, ejecucion directa del script como servidor local)
     if args is None:
         import uvicorn
-        import os
-        # Lee el puerto dinámico de Railway, y si no existe usa el 8000 por defecto
+        # Lee el puerto dinámico si existe, o usa el 8000 por defecto
         puerto = int(os.environ.get("PORT", 8000))
         print(f"Iniciando servidor de producción en el puerto {puerto}...")
-        uvicorn.run("python.clasificacion_residuos_ejemplo:app", host="0.0.0.0", port=puerto)
+        uvicorn.run("clasificacion_residuos_ejemplo:app", host="0.0.0.0", port=puerto)
     else:
         if args.command == "train":
             train(args.data, args.epochs)
