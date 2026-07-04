@@ -245,11 +245,21 @@ def parse_args() -> argparse.Namespace | None:
     return parser.parse_args()
 
 
+# ... (Todo el resto del código optimizado que te pasé arriba se mantiene exactamente igual)
+
 if __name__ == "__main__":
     args = parse_args()
 
-    if args and args.command == "train":
-        train(args.data, args.epochs)
-
-    if args and args.command == "predict":
-        predict_file(args.image)
+    # Si NO se pasaron argumentos de consola (es decir, lo está ejecutando Railway)
+    if args is None:
+        import uvicorn
+        import os
+        # Lee el puerto dinámico de Railway, y si no existe usa el 8000 por defecto
+        puerto = int(os.environ.get("PORT", 8000))
+        print(f"Iniciando servidor de producción en el puerto {puerto}...")
+        uvicorn.run("python.clasificacion_residuos_ejemplo:app", host="0.0.0.0", port=puerto)
+    else:
+        if args.command == "train":
+            train(args.data, args.epochs)
+        elif args.command == "predict":
+            predict_file(args.image)
