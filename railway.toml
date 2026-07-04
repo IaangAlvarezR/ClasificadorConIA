@@ -1,5 +1,11 @@
 [build]
 builder = "nixpacks"
+# Forzamos los proveedores a usar solo Python, ignorando Node
+providers = ["python"]
+
+[phases.install]
+# Le indicamos explícitamente cómo instalar tus librerías de Python
+cmds = ["pip install -r python/requirements.txt"]
 
 [deploy]
 startCommand = "uvicorn python.clasificacion_residuos_ejemplo:app --host 0.0.0.0 --port $PORT"
