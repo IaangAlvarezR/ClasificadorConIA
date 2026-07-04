@@ -16,13 +16,13 @@ export async function classifyImage(file) {
   }
 
   if (!response.ok) {
-    let message = 'No se pudo clasificar la imagen'
+    let message = `No se pudo clasificar la imagen usando ${API_URL}`
 
     try {
       const error = await response.json()
-      message = error.detail ?? message
+      message = `${error.detail ?? 'El backend rechazó la imagen'} (${API_URL})`
     } catch {
-      message = response.statusText || message
+      message = `${response.statusText || 'El backend respondió con error'} (${API_URL})`
     }
 
     throw new Error(message)
