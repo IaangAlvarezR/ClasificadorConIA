@@ -50,6 +50,7 @@ import tensorflow as tf
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
+import os
 
 
 IMAGE_SIZE = (224, 224)
