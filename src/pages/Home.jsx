@@ -53,7 +53,7 @@ export default function Home() {
             <h2>
               Clasificador <span>Inteligente</span> de Residuos
             </h2>
-            <p>Sube una imagen del residuo y la IA determinará si es reciclable o no reciclable.</p>
+            <p>Sube una imagen de un residuo como plástico, vidrio, lata, tetrapack o utensilio y la IA determinará si es reciclable o no reciclable.</p>
           </div>
 
           <aside className="mission-card">
