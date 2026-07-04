@@ -54,8 +54,12 @@ from PIL import Image
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
-MODEL_PATH = Path("python/modelo_residuos.keras")
-LABELS_PATH = Path("python/labels.json")
+# Obtener el directorio actual donde se encuentra este archivo de Python
+BASE_DIR = Path(__file__).resolve().parent
+
+# Configurar las rutas absolutas apuntando directamente al archivo en la misma carpeta
+MODEL_PATH = os.path.join(BASE_DIR, "modelo_residuos.keras")
+LABELS_PATH = os.path.join(BASE_DIR, "labels.json")
 
 app = FastAPI(title="EcoClasifica IA API")
 
