@@ -67,6 +67,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- NUEVA LÓGICA DE CARGA GLOBAL ---
+MODELO_GLOBAL = None
+ETIQUETAS_GLOBAL = None
+
+@app.on_event("startup")
+def load_model_on_startup():
+    """Carga el modelo de IA una sola vez cuando el servidor se enciende"""
+    global MODELO_GLOBAL, ETIQUETAS_GLOBAL
+    if MODEL_PATH.exists() and LABELS_PATH.exists():
+        print("Cargando modelo de IA en memoria...")
+        MODELO_GLOBAL = tf.keras.models.load_model(MODEL_PATH)
+        ETIQUETAS_GLOBAL = json.loads(LABELS_PATH.read_text(encoding="utf-8"))
+        print("¡Modelo cargado exitosamente!")
+    else:
+        print("Advertencia: No se encontraron los archivos del modelo en la ruta especificada.")
+
 
 def build_model(num_classes: int) -> tf.keras.Model:
     data_augmentation = tf.keras.Sequential(
@@ -159,17 +175,6 @@ def train(data_dir: Path, epochs: int) -> None:
     print(f"Etiquetas guardadas en: {LABELS_PATH.resolve()}")
 
 
-def load_model_and_labels() -> tuple[tf.keras.Model, list[str]]:
-    if not MODEL_PATH.exists() or not LABELS_PATH.exists():
-        raise FileNotFoundError(
-            "Falta modelo_residuos.keras o labels.json. Ejecuta primero el comando train."
-        )
-
-    model = tf.keras.models.load_model(MODEL_PATH)
-    labels = json.loads(LABELS_PATH.read_text(encoding="utf-8"))
-    return model, labels
-
-
 def preprocess_image(image: Image.Image) -> np.ndarray:
     image = image.convert("RGB").resize(IMAGE_SIZE)
     array = tf.keras.utils.img_to_array(image)
@@ -177,16 +182,20 @@ def preprocess_image(image: Image.Image) -> np.ndarray:
 
 
 def predict_from_image(image: Image.Image) -> dict[str, Any]:
-    model, labels = load_model_and_labels()
+    global MODELO_GLOBAL, ETIQUETAS_GLOBAL
+    
+    if MODELO_GLOBAL is None or ETIQUETAS_GLOBAL is None:
+        raise FileNotFoundError("El modelo no está cargado en el servidor.")
+        
     batch = preprocess_image(image)
-    probabilities = model.predict(batch, verbose=0)[0]
+    probabilities = MODELO_GLOBAL.predict(batch, verbose=0)[0]
     best_index = int(np.argmax(probabilities))
 
     return {
-        "label": labels[best_index],
+        "label": ETIQUETAS_GLOBAL[best_index],
         "confidence": round(float(probabilities[best_index]) * 100, 2),
         "probabilities": {
-            labels[index]: round(float(value) * 100, 2)
+            ETIQUETAS_GLOBAL[index]: round(float(value) * 100, 2)
             for index, value in enumerate(probabilities)
         },
     }
@@ -207,17 +216,22 @@ def health() -> dict[str, str]:
 
 
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)) -> dict[str, Any]:
+async def predict(file: UploadFile = File(...)):
     try:
         image = Image.open(file.file)
         return predict_from_image(image)
     except FileNotFoundError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+        raise HTTPException(status_code=503, detail=str(error))
     except Exception as error:
-        raise HTTPException(status_code=400, detail="No se pudo procesar la imagen") from error
+        print(f"Error interno al procesar: {error}")
+        raise HTTPException(status_code=400, detail="No se pudo procesar la imagen")
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace | None:
+    import sys
+    if len(sys.argv) == 1 or "uvicorn" in sys.argv[0]:
+        return None
+        
     parser = argparse.ArgumentParser(description="Clasificador de residuos")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -234,8 +248,8 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
 
-    if args.command == "train":
+    if args and args.command == "train":
         train(args.data, args.epochs)
 
-    if args.command == "predict":
+    if args and args.command == "predict":
         predict_file(args.image)
