@@ -1,11 +1,17 @@
 [build]
 builder = "nixpacks"
-# Forzamos los proveedores a usar solo Python, ignorando Node
-providers = ["python"]
+
+[phases.setup]
+# Forzamos explícitamente a instalar Python en lugar de Node
+cmds = ["curl -sSf https://ssh.nixpacks.com/install.sh | sh", "nix-env -iA nixpkgs.python311"]
 
 [phases.install]
-# Le indicamos explícitamente cómo instalar tus librerías de Python
+# Instalamos tus requerimientos de Python y evitamos que corra 'npm ci'
 cmds = ["pip install -r python/requirements.txt"]
+
+[phases.build]
+# Sobrescribimos la fase de construcción para dejarla vacía y saltarnos el 'npm run build' de Vite
+cmds = ["echo 'Saltando compilación de frontend...'"]
 
 [deploy]
 startCommand = "uvicorn python.clasificacion_residuos_ejemplo:app --host 0.0.0.0 --port $PORT"
