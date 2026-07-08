@@ -11,7 +11,10 @@ from clasificacion_residuos_ejemplo import (
     UNRELATED_IMAGE_DETAIL,
     app,
     build_local_reply,
+    build_label_metadata,
+    describe_prediction_label,
     get_gemini_reply,
+    validate_training_class_names,
     validate_prediction_confidence,
     validate_upload_file,
 )
@@ -86,6 +89,46 @@ def test_build_local_reply_handles_more_recycling_topics() -> None:
     assert "Pilas" in build_local_reply("Que hago con una pila usada?")
     assert "aceite" in build_local_reply("Donde tiro aceite de cocina?").lower()
     assert "organicos" in build_local_reply("Que hago con cascaras de fruta?").lower()
+
+
+def test_describe_prediction_label_derives_material_and_recyclability() -> None:
+    description = describe_prediction_label("plastic_non_recyclable")
+
+    assert description["material"] == "Plastico"
+    assert description["recyclability"] == "non_recyclable"
+    assert description["recyclability_label"] == "No reciclable"
+
+
+def test_describe_prediction_label_supports_dataset_folder_names() -> None:
+    juice_box = describe_prediction_label("juice_box_recyclable")
+    utensil = describe_prediction_label("utensil_non_recyclable")
+
+    assert juice_box["material"] == "Caja de jugo"
+    assert juice_box["recyclability_label"] == "Reciclable"
+    assert utensil["material"] == "Utensilio"
+    assert utensil["recyclability_label"] == "No reciclable"
+
+
+def test_describe_prediction_label_keeps_binary_labels() -> None:
+    description = describe_prediction_label("recyclable")
+
+    assert description["material"] is None
+    assert description["recyclability"] == "recyclable"
+    assert description["recyclability_label"] == "Reciclable"
+
+
+def test_build_label_metadata_for_training_classes() -> None:
+    metadata = build_label_metadata(["bottle_recyclable", "styrofoam_non_recyclable"])
+
+    assert metadata["bottle_recyclable"]["material"] == "Botella"
+    assert metadata["bottle_recyclable"]["recyclability_label"] == "Reciclable"
+    assert metadata["styrofoam_non_recyclable"]["material"] == "Unicel"
+    assert metadata["styrofoam_non_recyclable"]["recyclability_label"] == "No reciclable"
+
+
+def test_validate_training_class_names_rejects_incomplete_class_names() -> None:
+    with pytest.raises(ValueError):
+        validate_training_class_names(["BOTTLE", "CAN"])
 
 
 def test_get_gemini_reply_uses_generate_content(monkeypatch: pytest.MonkeyPatch) -> None:

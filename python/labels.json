@@ -1,4 +1,8 @@
 [
-  "non_recyclable",
-  "recyclable"
+  "bottle_recyclable",
+  "can_recyclable",
+  "juice_box_recyclable",
+  "milk_carton_recyclable",
+  "styrofoam_non_recyclable",
+  "utensil_non_recyclable"
 ]

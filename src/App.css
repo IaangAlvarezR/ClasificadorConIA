@@ -703,6 +703,20 @@
   animation: resultPop 0.35s ease both;
 }
 
+.result-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 6px 12px;
+  color: #0f5a43;
+  background: rgba(76, 255, 122, 0.14);
+  border: 1px solid rgba(15, 90, 67, 0.14);
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
 .error-state {
   color: #b42318;
   animation: messageSlide 0.25s ease both;

@@ -106,6 +106,7 @@ load_dotenv()
 # Configurar las rutas absolutas apuntando directamente al archivo en la misma carpeta como cadenas de texto (str)
 MODEL_PATH = os.path.join(BASE_DIR, "modelo_residuos.keras")
 LABELS_PATH = os.path.join(BASE_DIR, "labels.json")
+LABEL_METADATA_PATH = os.path.join(BASE_DIR, "label_metadata.json")
 
 app = FastAPI(title="EcoClasifica IA API")
 
@@ -229,6 +230,7 @@ def load_datasets(data_dir: Path) -> tuple[Any, Any, list[str]]:
     )
 
     class_names = train_ds.class_names
+    validate_training_class_names(class_names)
     autotune = tf.data.AUTOTUNE
 
     train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=autotune)
@@ -237,7 +239,12 @@ def load_datasets(data_dir: Path) -> tuple[Any, Any, list[str]]:
     return train_ds, val_ds, class_names
 
 
-def train(data_dir: Path, epochs: int) -> None:
+def train(data_dir: Path, epochs: int, fine_tune_epochs: int = 0, reset_model: bool = False) -> None:
+    if reset_model:
+        for path in [MODEL_PATH, LABELS_PATH, LABEL_METADATA_PATH]:
+            if os.path.exists(path):
+                os.remove(path)
+
     train_ds, val_ds, class_names = load_datasets(data_dir)
     model = build_model(num_classes=len(class_names))
 
@@ -254,16 +261,44 @@ def train(data_dir: Path, epochs: int) -> None:
         ),
     ]
 
+    print("Clases detectadas para entrenamiento:")
+    for class_name in class_names:
+        metadata = describe_prediction_label(class_name)
+        print(f"- {class_name}: {metadata['material']} / {metadata['recyclability_label']}")
+
     model.fit(train_ds, validation_data=val_ds, epochs=epochs, callbacks=callbacks)
+
+    if fine_tune_epochs > 0:
+        base_model = next((layer for layer in model.layers if hasattr(layer, "layers") and len(layer.layers) > 20), None)
+        if base_model is not None:
+            base_model.trainable = True
+            for layer in base_model.layers[:-20]:
+                layer.trainable = False
+
+            model.compile(
+                optimizer=tf.keras.optimizers.Adam(learning_rate=0.00005),
+                loss="sparse_categorical_crossentropy",
+                metrics=["accuracy"],
+            )
+            model.fit(
+                train_ds,
+                validation_data=val_ds,
+                epochs=fine_tune_epochs,
+                callbacks=callbacks,
+            )
 
     if not os.path.exists(MODEL_PATH):
         model.save(MODEL_PATH)
 
     with open(LABELS_PATH, "w", encoding="utf-8") as f:
         json.dump(class_names, f, indent=2)
+
+    with open(LABEL_METADATA_PATH, "w", encoding="utf-8") as f:
+        json.dump(build_label_metadata(class_names), f, indent=2, ensure_ascii=False)
         
     print(f"Modelo guardado en: {os.path.abspath(MODEL_PATH)}")
     print(f"Etiquetas guardadas en: {os.path.abspath(LABELS_PATH)}")
+    print(f"Metadatos guardados en: {os.path.abspath(LABEL_METADATA_PATH)}")
 
 
 def preprocess_image(image: Image.Image) -> np.ndarray:
@@ -289,6 +324,123 @@ def validate_prediction_confidence(probabilities: np.ndarray) -> None:
         raise HTTPException(status_code=422, detail=UNRELATED_IMAGE_DETAIL)
 
 
+MATERIAL_NAMES = {
+    "bottle": "Botella",
+    "botella": "Botella",
+    "can": "Lata",
+    "lata": "Lata",
+    "juice_box": "Caja de jugo",
+    "milk_carton": "Carton de leche",
+    "carton_leche": "Carton de leche",
+    "styrofoam": "Unicel",
+    "unicel": "Unicel",
+    "utensil": "Utensilio",
+    "utensilio": "Utensilio",
+    "cardboard": "Carton",
+    "carton": "Carton",
+    "glass": "Vidrio",
+    "vidrio": "Vidrio",
+    "metal": "Metal",
+    "paper": "Papel",
+    "papel": "Papel",
+    "plastic": "Plastico",
+    "plastico": "Plastico",
+    "trash": "Basura general",
+    "basura": "Basura general",
+    "organic": "Organico",
+    "organico": "Organico",
+    "battery": "Pila o bateria",
+    "bateria": "Pila o bateria",
+    "electronic": "Electronico",
+    "electronico": "Electronico",
+    "textile": "Textil",
+    "textil": "Textil",
+}
+
+MATERIAL_RECYCLABILITY_DEFAULTS = {
+    "bottle": "recyclable",
+    "botella": "recyclable",
+    "can": "recyclable",
+    "lata": "recyclable",
+    "juice_box": "recyclable",
+    "milk_carton": "recyclable",
+    "carton_leche": "recyclable",
+    "styrofoam": "non_recyclable",
+    "unicel": "non_recyclable",
+    "utensil": "non_recyclable",
+    "utensilio": "non_recyclable",
+    "cardboard": "recyclable",
+    "carton": "recyclable",
+    "glass": "recyclable",
+    "vidrio": "recyclable",
+    "metal": "recyclable",
+    "paper": "recyclable",
+    "papel": "recyclable",
+    "plastic": "non_recyclable",
+    "plastico": "non_recyclable",
+    "trash": "non_recyclable",
+    "basura": "non_recyclable",
+    "organic": "non_recyclable",
+    "organico": "non_recyclable",
+    "battery": "non_recyclable",
+    "bateria": "non_recyclable",
+    "electronic": "non_recyclable",
+    "electronico": "non_recyclable",
+    "textile": "non_recyclable",
+    "textil": "non_recyclable",
+}
+
+RECYCLABILITY_NAMES = {
+    "recyclable": "Reciclable",
+    "non_recyclable": "No reciclable",
+}
+
+
+def describe_prediction_label(label: str) -> dict[str, str | None]:
+    normalized = label.lower().replace("-", "_").replace(" ", "_")
+    material_key = next((key for key in MATERIAL_NAMES if key in normalized), None)
+
+    if "non_recyclable" in normalized or "no_reciclable" in normalized:
+        recyclability = "non_recyclable"
+    elif "recyclable" in normalized or "reciclable" in normalized:
+        recyclability = "recyclable"
+    elif material_key:
+        recyclability = MATERIAL_RECYCLABILITY_DEFAULTS.get(material_key)
+    else:
+        recyclability = None
+
+    return {
+        "material": MATERIAL_NAMES.get(material_key) if material_key else None,
+        "recyclability": recyclability,
+        "recyclability_label": RECYCLABILITY_NAMES.get(recyclability) if recyclability else None,
+    }
+
+
+def build_label_metadata(class_names: list[str]) -> dict[str, dict[str, str | None]]:
+    return {class_name: describe_prediction_label(class_name) for class_name in class_names}
+
+
+def validate_training_class_names(class_names: list[str]) -> None:
+    invalid_classes = []
+    for class_name, metadata in build_label_metadata(class_names).items():
+        normalized = class_name.lower().replace("-", "_").replace(" ", "_")
+        has_explicit_recyclability = (
+            "non_recyclable" in normalized
+            or "no_reciclable" in normalized
+            or "recyclable" in normalized
+            or "reciclable" in normalized
+        )
+        if metadata["material"] is None or metadata["recyclability"] is None or not has_explicit_recyclability:
+            invalid_classes.append(class_name)
+
+    if invalid_classes:
+        invalid = ", ".join(invalid_classes)
+        raise ValueError(
+            "Las carpetas del dataset deben incluir material y reciclabilidad, "
+            f"por ejemplo bottle_recyclable o utensil_non_recyclable. Revisa: {invalid}"
+        )
+
+
 def predict_from_image(image: Image.Image) -> dict[str, Any]:
     global MODELO_GLOBAL, ETIQUETAS_GLOBAL
 
@@ -302,9 +454,12 @@ def predict_from_image(image: Image.Image) -> dict[str, Any]:
     probabilities = MODELO_GLOBAL.predict(batch, verbose=0)[0]
     validate_prediction_confidence(probabilities)
     best_index = int(np.argmax(probabilities))
+    label = ETIQUETAS_GLOBAL[best_index]
+    label_description = describe_prediction_label(label)
 
     return {
-        "label": ETIQUETAS_GLOBAL[best_index],
+        "label": label,
+        **label_description,
         "confidence": round(float(probabilities[best_index]) * 100, 2),
         "probabilities": {
             ETIQUETAS_GLOBAL[index]: round(float(value) * 100, 2)
@@ -629,6 +784,8 @@ def parse_args() -> argparse.Namespace | None:
     train_parser = subparsers.add_parser("train", help="Entrena el modelo")
     train_parser.add_argument("--data", type=Path, required=True, help="Carpeta del dataset")
     train_parser.add_argument("--epochs", type=int, default=10, help="Numero de epocas")
+    train_parser.add_argument("--fine-tune-epochs", type=int, default=0, help="Epocas extra para ajustar EfficientNet")
+    train_parser.add_argument("--reset-model", action="store_true", help="Elimina modelo y etiquetas previas antes de entrenar")
 
     predict_parser = subparsers.add_parser("predict", help="Predice una imagen")
     predict_parser.add_argument("--image", type=Path, required=True, help="Ruta de la imagen")
@@ -648,6 +805,6 @@ if __name__ == "__main__":
         uvicorn.run("clasificacion_residuos_ejemplo:app", host="0.0.0.0", port=puerto)
     else:
         if args.command == "train":
-            train(args.data, args.epochs)
+            train(args.data, args.epochs, args.fine_tune_epochs, args.reset_model)
         elif args.command == "predict":
             predict_file(args.image)

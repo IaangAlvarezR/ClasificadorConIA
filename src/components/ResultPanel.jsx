@@ -14,10 +14,65 @@ import Loader from './Loader.jsx'
 const labelNames = {
   recyclable: 'Reciclable',
   non_recyclable: 'No reciclable',
+  bottle_recyclable: 'Botella: Reciclable',
+  can_recyclable: 'Lata: Reciclable',
+  juice_box_recyclable: 'Caja de jugo: Reciclable',
+  milk_carton_recyclable: 'Carton de leche: Reciclable',
+  styrofoam_non_recyclable: 'Unicel: No reciclable',
+  utensil_non_recyclable: 'Utensilio: No reciclable',
+  bottle: 'Botella',
+  can: 'Lata',
+  juice_box: 'Caja de jugo',
+  milk_carton: 'Carton de leche',
+  styrofoam: 'Unicel',
+  utensil: 'Utensilio',
+  cardboard: 'Carton',
+  glass: 'Vidrio',
+  metal: 'Metal',
+  paper: 'Papel',
+  plastic: 'Plastico',
+  trash: 'Basura general',
+  organic: 'Organico',
+  battery: 'Pila o bateria',
+  electronic: 'Electronico',
+  textile: 'Textil',
+  carton: 'Carton',
+  vidrio: 'Vidrio',
+  papel: 'Papel',
+  plastico: 'Plastico',
+  basura: 'Basura general',
+  organico: 'Organico',
+}
+
+const binaryLabels = new Set(['recyclable', 'non_recyclable'])
+
+function getResultTitle(result) {
+  if (!result) {
+    return ''
+  }
+
+  if (result.material && result.recyclability_label) {
+    return `${result.material}: ${result.recyclability_label}`
+  }
+
+  if (result.material) {
+    return result.material
+  }
+
+  return labelNames[result.label] ?? result.label
+}
+
+function getResultType(result) {
+  if (!result) {
+    return ''
+  }
+
+  return result.material ? 'Tipo de basura' : binaryLabels.has(result.label) ? 'Clasificacion' : 'Tipo de basura'
 }
 
 export default function ResultPanel({ previewUrl, result, isLoading, error }) {
-  const label = result ? labelNames[result.label] ?? result.label : ''
+  const label = getResultTitle(result)
+  const resultType = getResultType(result)
 
   return (
     <section className="panel">
@@ -44,6 +99,7 @@ export default function ResultPanel({ previewUrl, result, isLoading, error }) {
         ) : result ? (
           <div className="result-state">
             <CheckCircle2 size={96} aria-hidden="true" />
+            <span className="result-kind">{resultType}</span>
             <h3>{label}</h3>
             <p>Confianza del modelo: {result.confidence}%</p>
             {result.probabilities ? (

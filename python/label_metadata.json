@@ -1,0 +1,32 @@
+{
+  "bottle_recyclable": {
+    "material": "Botella",
+    "recyclability": "recyclable",
+    "recyclability_label": "Reciclable"
+  },
+  "can_recyclable": {
+    "material": "Lata",
+    "recyclability": "recyclable",
+    "recyclability_label": "Reciclable"
+  },
+  "juice_box_recyclable": {
+    "material": "Caja de jugo",
+    "recyclability": "recyclable",
+    "recyclability_label": "Reciclable"
+  },
+  "milk_carton_recyclable": {
+    "material": "Carton de leche",
+    "recyclability": "recyclable",
+    "recyclability_label": "Reciclable"
+  },
+  "styrofoam_non_recyclable": {
+    "material": "Unicel",
+    "recyclability": "non_recyclable",
+    "recyclability_label": "No reciclable"
+  },
+  "utensil_non_recyclable": {
+    "material": "Utensilio",
+    "recyclability": "non_recyclable",
+    "recyclability_label": "No reciclable"
+  }
+}
