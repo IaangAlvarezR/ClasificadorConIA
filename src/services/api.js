@@ -1,5 +1,16 @@
 const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 
+function getPublicErrorMessage(fallback) {
+  return async (response) => {
+    try {
+      const error = await response.json()
+      return error.detail ?? fallback
+    } catch {
+      return fallback
+    }
+  }
+}
+
 export async function classifyImage(file) {
   const formData = new FormData()
   formData.append('file', file)
@@ -12,19 +23,11 @@ export async function classifyImage(file) {
       body: formData,
     })
   } catch {
-    throw new Error(`No se pudo conectar con el backend: ${API_URL}`)
+    throw new Error('No se pudo conectar con el servicio de analisis. Intenta de nuevo mas tarde.')
   }
 
   if (!response.ok) {
-    let message
-
-    try {
-      const error = await response.json()
-      message = `${error.detail ?? 'El backend rechazó la imagen'} (${API_URL})`
-    } catch {
-      message = `${response.statusText || 'El backend respondió con error'} (${API_URL})`
-    }
-
+    const message = await getPublicErrorMessage('No se pudo analizar la imagen seleccionada.')(response)
     throw new Error(message)
   }
 
@@ -43,19 +46,11 @@ export async function askChatbot(question) {
       body: JSON.stringify({ question }),
     })
   } catch {
-    throw new Error(`No se pudo conectar con el backend: ${API_URL}`)
+    throw new Error('No se pudo conectar con el asistente. Intenta de nuevo mas tarde.')
   }
 
   if (!response.ok) {
-    let message
-
-    try {
-      const error = await response.json()
-      message = `${error.detail ?? 'El backend rechazó la pregunta'} (${API_URL})`
-    } catch {
-      message = `${response.statusText || 'El backend respondió con error'} (${API_URL})`
-    }
-
+    const message = await getPublicErrorMessage('No se pudo enviar la pregunta al asistente.')(response)
     throw new Error(message)
   }
 

@@ -10,6 +10,7 @@ from clasificacion_residuos_ejemplo import (
     MAX_UPLOAD_SIZE,
     UNRELATED_IMAGE_DETAIL,
     app,
+    build_local_reply,
     get_gemini_reply,
     validate_prediction_confidence,
     validate_upload_file,
@@ -66,7 +67,7 @@ def test_validate_upload_file_rejects_large_file() -> None:
 
 
 def test_validate_prediction_confidence_accepts_clear_prediction() -> None:
-    validate_prediction_confidence([0.08, 0.92])
+    validate_prediction_confidence([0.04, 0.96])
 
 
 def test_validate_prediction_confidence_rejects_unrelated_or_uncertain_image() -> None:
@@ -75,6 +76,12 @@ def test_validate_prediction_confidence_rejects_unrelated_or_uncertain_image() -
 
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == UNRELATED_IMAGE_DETAIL
+
+
+def test_build_local_reply_handles_more_recycling_topics() -> None:
+    assert "Pilas" in build_local_reply("Que hago con una pila usada?")
+    assert "aceite" in build_local_reply("Donde tiro aceite de cocina?").lower()
+    assert "organicos" in build_local_reply("Que hago con cascaras de fruta?").lower()
 
 
 def test_get_gemini_reply_uses_generate_content(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -98,13 +105,13 @@ def test_get_gemini_reply_uses_generate_content(monkeypatch: pytest.MonkeyPatch)
         return FakeResponse()
 
     monkeypatch.setattr("clasificacion_residuos_ejemplo.GOOGLE_API_KEY", "test-key")
-    monkeypatch.setattr("clasificacion_residuos_ejemplo.GOOGLE_MODEL", "gemini-2.0-flash")
+    monkeypatch.setattr("clasificacion_residuos_ejemplo.GOOGLE_MODEL", "gemini-flash-lite-latest")
     monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
 
     reply = get_gemini_reply("Una botella de vidrio limpia es reciclable?")
 
     assert reply == "Si, es reciclable."
-    assert captured["url"].endswith("/v1beta/models/gemini-2.0-flash:generateContent")
+    assert captured["url"].endswith("/v1beta/models/gemini-flash-lite-latest:generateContent")
     assert captured["headers"]["X-goog-api-key"] == "test-key"
     assert b"systemInstruction" in captured["body"]
     assert captured["timeout"] == 20

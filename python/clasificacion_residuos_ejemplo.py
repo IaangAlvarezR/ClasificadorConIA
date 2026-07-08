@@ -64,8 +64,8 @@ except ModuleNotFoundError:
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
-MIN_RECYCLING_CONFIDENCE = float(os.environ.get("MIN_RECYCLING_CONFIDENCE", "0.70"))
-MIN_RECYCLING_MARGIN = float(os.environ.get("MIN_RECYCLING_MARGIN", "0.20"))
+MIN_RECYCLING_CONFIDENCE = float(os.environ.get("MIN_RECYCLING_CONFIDENCE", "0.90"))
+MIN_RECYCLING_MARGIN = float(os.environ.get("MIN_RECYCLING_MARGIN", "0.60"))
 UNRELATED_IMAGE_DETAIL = (
     "La imagen no parece corresponder a un residuo reconocible. "
     "Sube una foto clara de basura, envases, botellas, latas, carton, plastico o materiales reciclables."
@@ -131,7 +131,15 @@ LLM_DISABLED_UNTIL = 0.0
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "openai").lower()
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash")
+GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-flash-lite-latest")
+GOOGLE_FALLBACK_MODELS = [
+    model.strip()
+    for model in os.environ.get(
+        "GOOGLE_FALLBACK_MODELS",
+        "gemini-2.5-flash-lite,gemini-flash-lite-latest",
+    ).split(",")
+    if model.strip()
+]
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 
 @app.on_event("startup")
@@ -336,6 +344,89 @@ def build_local_reply(question: str) -> str:
     return "Solo puedo ayudar con preguntas relacionadas con reciclaje, residuos y las clases que se manejan en este proyecto. Si quieres, pregúntame por botellas, latas, tetrapack, utensilios o styrofoam."
 
 
+def build_local_reply(question: str) -> str:
+    normalized = unicodedata.normalize("NFKD", question)
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    normalized = re.sub(r"[^\w\s]", "", normalized).lower()
+
+    local_replies = [
+        (
+            ["hola", "ayuda", "que puedes hacer", "como funciona"],
+            "Puedo ayudarte con dudas sobre reciclaje, separacion de residuos, limpieza de envases y las categorias del proyecto: reciclable y no reciclable.",
+        ),
+        (
+            ["limpiar", "lavar", "sucio", "grasoso", "comida", "contaminado"],
+            "Si un envase tiene restos de comida, aceite o liquidos, conviene vaciarlo y enjuagarlo. Un residuo limpio tiene mas probabilidades de ser reciclable.",
+        ),
+        (
+            ["papel", "carton", "periodico", "cuaderno", "caja de carton"],
+            "Papel y carton suelen ser reciclables si estan secos y limpios. Si estan mojados, con grasa o con restos de comida, pueden dejar de aceptarse.",
+        ),
+        (
+            ["vidrio", "frasco", "botella de vidrio"],
+            "El vidrio limpio, como botellas y frascos, suele ser reciclable. Evita mezclarlo con ceramica, espejos o focos, porque normalmente requieren manejo especial.",
+        ),
+        (
+            ["metal", "aluminio", "lata", "conserva"],
+            "Las latas de aluminio o metal limpias suelen ser reciclables. Lo mejor es vaciarlas, enjuagarlas y separarlas de residuos organicos.",
+        ),
+        (
+            ["plastico", "pet", "bolsa", "botella plastica", "envase plastico"],
+            "Muchos plasticos, como botellas PET limpias, pueden reciclarse. Bolsas, envolturas flexibles y plasticos sucios dependen mucho del centro de acopio local.",
+        ),
+        (
+            ["tetrapack", "tetrabrik", "jugo", "leche", "caja"],
+            "Los envases tipo tetrapack pueden reciclarse en lugares que aceptan materiales multicapa. Vacialos, enjuagalos y aplastalos antes de separarlos.",
+        ),
+        (
+            ["organico", "comida", "fruta", "verdura", "cascaras", "jardin"],
+            "Los residuos organicos, como restos de fruta, verdura y poda, no van con reciclables secos. Pueden aprovecharse en composta si estan separados.",
+        ),
+        (
+            ["pila", "bateria", "electronico", "celular", "cargador", "cable"],
+            "Pilas, baterias y electronicos no deben tirarse con basura comun. Llevan metales y componentes que requieren puntos de recoleccion especializados.",
+        ),
+        (
+            ["aceite", "cocina", "fritura"],
+            "El aceite usado no debe ir al drenaje. Guardalo frio en una botella cerrada y llevalo a un punto de recoleccion si existe en tu localidad.",
+        ),
+        (
+            ["medicina", "medicamento", "pastilla", "jarabe"],
+            "Los medicamentos caducos no deben mezclarse con reciclables ni tirarse al drenaje. Lo ideal es llevarlos a un contenedor o farmacia con programa de acopio.",
+        ),
+        (
+            ["ropa", "textil", "zapato", "tela"],
+            "La ropa y textiles no suelen clasificarse como reciclables comunes. Si estan en buen estado, donarlos o reutilizarlos suele ser mejor opcion.",
+        ),
+        (
+            ["unicel", "styrofoam", "espuma", "poliestireno"],
+            "El unicel o espuma de poliestireno suele ser dificil de reciclar y muchas redes no lo aceptan, especialmente si tiene restos de comida.",
+        ),
+        (
+            ["contenedor", "color", "verde", "amarillo", "azul", "separar"],
+            "Los colores de contenedores cambian por ciudad, pero la regla practica es separar reciclables limpios y secos, organicos, residuos sanitarios y residuos especiales.",
+        ),
+        (
+            ["sanitario", "papel higienico", "panal", "toalla femenina", "cubrebocas"],
+            "Los residuos sanitarios no se consideran reciclables. Deben ir cerrados en una bolsa y separados de materiales limpios como papel, carton, vidrio o metal.",
+        ),
+        (
+            ["foco", "lampara", "bombilla", "fluorescente"],
+            "Focos, lamparas y fluorescentes requieren manejo especial. No los mezcles con vidrio comun porque pueden contener componentes peligrosos.",
+        ),
+        (
+            ["ia", "modelo", "cnn", "clasificador", "proyecto", "clase", "categoria"],
+            "El proyecto usa un modelo de IA para distinguir residuos reciclables y no reciclables. Si la imagen no parece un residuo, el sistema puede rechazarla por baja confianza.",
+        ),
+    ]
+
+    for tokens, reply in local_replies:
+        if any(token in normalized for token in tokens):
+            return reply
+
+    return "Puedo orientarte sobre residuos reciclables, no reciclables y manejo responsable. Dame el material o ejemplo concreto, como botella, lata, carton, pila, aceite, ropa o tetrapack."
+
+
 def get_openai_reply(question: str) -> str | None:
     if not OPENAI_API_KEY:
         return None
@@ -378,56 +469,64 @@ def get_gemini_reply(question: str) -> str | None:
     if not GOOGLE_API_KEY:
         return None
 
-    try:
-        payload = {
-            "contents": [
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": question}],
+            }
+        ],
+        "systemInstruction": {
+            "parts": [
                 {
-                    "role": "user",
-                    "parts": [{"text": question}],
+                    "text": (
+                        "Responde unicamente sobre reciclaje, residuos y las clases del proyecto "
+                        "EcoClasifica IA. Nunca respondas fuera de ese contexto. Responde en espanol."
+                    )
                 }
-            ],
-            "systemInstruction": {
-                "parts": [
-                    {
-                        "text": (
-                            "Responde unicamente sobre reciclaje, residuos y las clases del proyecto "
-                            "EcoClasifica IA. Nunca respondas fuera de ese contexto. Responde en espanol."
-                        )
-                    }
-                ]
-            },
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 256,
-                "candidateCount": 1,
-            },
-        }
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GOOGLE_MODEL}:generateContent"
-        request = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": GOOGLE_API_KEY,
-            },
-            method="POST",
-        )
-        with urllib.request.urlopen(request, timeout=20) as response:
-            body = json.loads(response.read().decode("utf-8"))
-            candidates = body.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                text = "".join(part.get("text", "") for part in parts)
-                return text.strip() or None
-        return None
-    except urllib.error.HTTPError as error:
-        if error.code in {429, 500, 502, 503, 504}:
-            return "__RATE_LIMIT__"
-        print(f"Error al consultar Gemini: {error}")
-        return None
-    except Exception as error:
-        print(f"Error al consultar Gemini: {error}")
-        return None
+            ]
+        },
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 256,
+            "candidateCount": 1,
+        },
+    }
+    models_to_try = list(dict.fromkeys([GOOGLE_MODEL, *GOOGLE_FALLBACK_MODELS]))
+    had_temporary_error = False
+
+    for model in models_to_try:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            request = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": GOOGLE_API_KEY,
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=20) as response:
+                body = json.loads(response.read().decode("utf-8"))
+                candidates = body.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    text = "".join(part.get("text", "") for part in parts)
+                    return text.strip() or None
+        except urllib.error.HTTPError as error:
+            if error.code in {429, 500, 502, 503, 504}:
+                had_temporary_error = True
+                continue
+            print(f"Error al consultar Gemini: {error}")
+            return None
+        except Exception as error:
+            print(f"Error al consultar Gemini: {error}")
+            return None
+
+    if had_temporary_error:
+        return "__RATE_LIMIT__"
+    return None
 
 
 def get_chat_reply(question: str) -> str:

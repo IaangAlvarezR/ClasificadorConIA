@@ -3,42 +3,112 @@ import { Bot, Leaf, SendHorizontal } from 'lucide-react'
 import { askChatbot } from '../services/api.js'
 
 const QUICK_PROMPTS = [
-  '¿Qué materiales son reciclables?',
-  '¿Qué pasa con un tetrapack o jugo en caja?',
-  '¿Cómo clasifica la IA un utensilio?',
+  'Que materiales son reciclables?',
+  'Que hago con una pila?',
+  'Como separo residuos en casa?',
+]
+
+const LOCAL_REPLIES = [
+  {
+    patterns: ['hola', 'ayuda', 'que puedes hacer', 'como funciona'],
+    reply:
+      'Puedo ayudarte con dudas sobre reciclaje, separacion de residuos, limpieza de envases y las categorias del proyecto: reciclable y no reciclable.',
+  },
+  {
+    patterns: ['limpiar', 'lavar', 'sucio', 'grasoso', 'comida', 'contaminado'],
+    reply:
+      'Si un envase tiene restos de comida, aceite o liquidos, conviene vaciarlo y enjuagarlo. Un residuo limpio tiene mas probabilidades de ser reciclable.',
+  },
+  {
+    patterns: ['papel', 'carton', 'periodico', 'cuaderno', 'caja de carton'],
+    reply:
+      'Papel y carton suelen ser reciclables si estan secos y limpios. Si estan mojados, con grasa o con restos de comida, pueden dejar de aceptarse.',
+  },
+  {
+    patterns: ['vidrio', 'frasco', 'botella de vidrio'],
+    reply:
+      'El vidrio limpio, como botellas y frascos, suele ser reciclable. Evita mezclarlo con ceramica, espejos o focos, porque normalmente requieren manejo especial.',
+  },
+  {
+    patterns: ['metal', 'aluminio', 'lata', 'conserva'],
+    reply:
+      'Las latas de aluminio o metal limpias suelen ser reciclables. Lo mejor es vaciarlas, enjuagarlas y separarlas de residuos organicos.',
+  },
+  {
+    patterns: ['plastico', 'pet', 'bolsa', 'botella plastica', 'envase plastico'],
+    reply:
+      'Muchos plasticos, como botellas PET limpias, pueden reciclarse. Bolsas, envolturas flexibles y plasticos sucios dependen mucho del centro de acopio local.',
+  },
+  {
+    patterns: ['tetrapack', 'tetrabrik', 'jugo', 'leche', 'caja'],
+    reply:
+      'Los envases tipo tetrapack pueden reciclarse en lugares que aceptan materiales multicapa. Vacialos, enjuagalos y aplastalos antes de separarlos.',
+  },
+  {
+    patterns: ['organico', 'comida', 'fruta', 'verdura', 'cascaras', 'jardin'],
+    reply:
+      'Los residuos organicos, como restos de fruta, verdura y poda, no van con reciclables secos. Pueden aprovecharse en composta si estan separados.',
+  },
+  {
+    patterns: ['pila', 'bateria', 'electronico', 'celular', 'cargador', 'cable'],
+    reply:
+      'Pilas, baterias y electronicos no deben tirarse con basura comun. Llevan metales y componentes que requieren puntos de recoleccion especializados.',
+  },
+  {
+    patterns: ['aceite', 'cocina', 'fritura'],
+    reply:
+      'El aceite usado no debe ir al drenaje. Guardalo frio en una botella cerrada y llevalo a un punto de recoleccion si existe en tu localidad.',
+  },
+  {
+    patterns: ['medicina', 'medicamento', 'pastilla', 'jarabe'],
+    reply:
+      'Los medicamentos caducos no deben mezclarse con reciclables ni tirarse al drenaje. Lo ideal es llevarlos a un contenedor o farmacia con programa de acopio.',
+  },
+  {
+    patterns: ['ropa', 'textil', 'zapato', 'tela'],
+    reply:
+      'La ropa y textiles no suelen clasificarse como reciclables comunes. Si estan en buen estado, donarlos o reutilizarlos suele ser mejor opcion.',
+  },
+  {
+    patterns: ['unicel', 'styrofoam', 'espuma', 'poliestireno'],
+    reply:
+      'El unicel o espuma de poliestireno suele ser dificil de reciclar y muchas redes no lo aceptan, especialmente si tiene restos de comida.',
+  },
+  {
+    patterns: ['contenedor', 'color', 'verde', 'amarillo', 'azul', 'separar'],
+    reply:
+      'Los colores de contenedores cambian por ciudad, pero la regla practica es separar reciclables limpios y secos, organicos, residuos sanitarios y residuos especiales.',
+  },
+  {
+    patterns: ['sanitario', 'papel higienico', 'panal', 'toalla femenina', 'cubrebocas'],
+    reply:
+      'Los residuos sanitarios no se consideran reciclables. Deben ir cerrados en una bolsa y separados de materiales limpios como papel, carton, vidrio o metal.',
+  },
+  {
+    patterns: ['foco', 'lampara', 'bombilla', 'fluorescente'],
+    reply:
+      'Focos, lamparas y fluorescentes requieren manejo especial. No los mezcles con vidrio comun porque pueden contener componentes peligrosos.',
+  },
+  {
+    patterns: ['ia', 'modelo', 'cnn', 'clasificador', 'proyecto', 'clase', 'categoria'],
+    reply:
+      'El proyecto usa un modelo de IA para distinguir residuos reciclables y no reciclables. Si la imagen no parece un residuo, el sistema puede rechazarla por baja confianza.',
+  },
 ]
 
 function buildReply(question) {
   const normalized = question
     .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^\w\s]/g, '')
     .toLowerCase()
 
-  if (/(hola|ayuda|qué puedes hacer|como funciona)/.test(normalized)) {
-    return 'Puedo responder preguntas sobre reciclaje, clasificación de residuos y las categorías que usa este proyecto: reciclable y no reciclable.'
+  const match = LOCAL_REPLIES.find(({ patterns }) => patterns.some((pattern) => normalized.includes(pattern)))
+  if (match) {
+    return match.reply
   }
 
-  if (/(reciclable|reciclaje|reciclar|papel|carton|vidrio|metal|botella|lata|envase)/.test(normalized)) {
-    return 'En general, los materiales como vidrio, latas, botellas limpias y papel o cartón secos suelen ser reciclables, siempre que estén limpios y separados correctamente.'
-  }
-
-  if (/(tetrapack|caja|jugo|leche|carton|envase carton)/.test(normalized)) {
-    return 'Los envases tipo tetrapack o cajas de jugo suelen requerir atención especial. Muchas veces se reciclan, pero dependen del tipo de material y de la infraestructura local.'
-  }
-
-  if (/(styrofoam|espuma|poliestireno)/.test(normalized)) {
-    return 'El styrofoam o espuma de poliestireno suele considerarse difícil de reciclar y, en muchos casos, se clasifica como no reciclable para este proyecto.'
-  }
-
-  if (/(utensilio|cuchara|tenedor|cubiertos|plástico de un solo uso)/.test(normalized)) {
-    return 'Los utensilios y los plásticos de un solo uso suelen entrar en la categoría de no reciclable cuando están muy contaminados o cuando no son aceptados por la red de reciclaje local.'
-  }
-
-  if (/(ia|modelo|cnn|clasificador|proyecto|clase|categoría)/.test(normalized)) {
-    return 'Este proyecto usa una IA para clasificar residuos en dos grandes categorías: reciclable y no reciclable, con ejemplos como botellas, latas, cajas, utensilios y empaques especiales.'
-  }
-
-  return 'Solo puedo ayudar con preguntas relacionadas con reciclaje, residuos y las clases que se manejan en este proyecto. Si quieres, pregúntame por botellas, latas, tetrapack, utensilios o styrofoam.'
+  return 'Puedo orientarte sobre residuos reciclables, no reciclables y manejo responsable. Dame el material o ejemplo concreto, como botella, lata, carton, pila, aceite, ropa o tetrapack.'
 }
 
 export default function Chat() {
@@ -47,7 +117,7 @@ export default function Chat() {
     {
       id: 1,
       role: 'assistant',
-      content: 'Hola. Puedo ayudarte con dudas sobre reciclaje y cómo se clasifican los residuos en este proyecto.',
+      content: 'Hola. Puedo ayudarte con dudas sobre reciclaje y como se clasifican los residuos en este proyecto.',
     },
   ])
   const [input, setInput] = useState('')
@@ -143,7 +213,7 @@ export default function Chat() {
           </button>
         </form>
 
-        <p className="chat-hint">Ejemplos: ¿Qué es reciclable?, ¿Qué pasa con un tetrapack? o ¿Cómo se clasifica un utensilio?</p>
+        <p className="chat-hint">Ejemplos: que es reciclable, que hago con una pila o como separo residuos en casa.</p>
       </div>
     </section>
   )

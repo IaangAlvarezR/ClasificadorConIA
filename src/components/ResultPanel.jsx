@@ -39,7 +39,7 @@ export default function ResultPanel({ previewUrl, result, isLoading, error }) {
             <AlertCircle size={88} aria-hidden="true" />
             <h3>No se pudo analizar</h3>
             <p>{error}</p>
-            <small>Verifica que el backend esté activo y que VITE_API_URL apunte a su URL pública.</small>
+            <small>Prueba con una foto clara de un residuo sobre un fondo sencillo.</small>
           </div>
         ) : result ? (
           <div className="result-state">
