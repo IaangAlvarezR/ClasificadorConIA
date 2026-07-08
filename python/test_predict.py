@@ -70,9 +70,13 @@ def test_validate_prediction_confidence_accepts_clear_prediction() -> None:
     validate_prediction_confidence([0.04, 0.96])
 
 
+def test_validate_prediction_confidence_accepts_phone_quality_prediction() -> None:
+    validate_prediction_confidence([0.22, 0.78])
+
+
 def test_validate_prediction_confidence_rejects_unrelated_or_uncertain_image() -> None:
     with pytest.raises(HTTPException) as exc_info:
-        validate_prediction_confidence([0.48, 0.52])
+        validate_prediction_confidence([0.38, 0.62])
 
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == UNRELATED_IMAGE_DETAIL

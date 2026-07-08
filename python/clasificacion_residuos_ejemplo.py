@@ -64,8 +64,8 @@ except ModuleNotFoundError:
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
-MIN_RECYCLING_CONFIDENCE = float(os.environ.get("MIN_RECYCLING_CONFIDENCE", "0.90"))
-MIN_RECYCLING_MARGIN = float(os.environ.get("MIN_RECYCLING_MARGIN", "0.60"))
+MIN_RECYCLING_CONFIDENCE = float(os.environ.get("MIN_RECYCLING_CONFIDENCE", "0.76"))
+MIN_RECYCLING_MARGIN = float(os.environ.get("MIN_RECYCLING_MARGIN", "0.28"))
 UNRELATED_IMAGE_DETAIL = (
     "La imagen no parece corresponder a un residuo reconocible. "
     "Sube una foto clara de basura, envases, botellas, latas, carton, plastico o materiales reciclables."

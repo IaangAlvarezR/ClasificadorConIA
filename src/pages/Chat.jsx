@@ -8,6 +8,9 @@ const QUICK_PROMPTS = [
   'Como separo residuos en casa?',
 ]
 
+const THINKING_DELAY_MIN_MS = 1000
+const THINKING_DELAY_MAX_MS = 4000
+
 const LOCAL_REPLIES = [
   {
     patterns: ['hola', 'ayuda', 'que puedes hacer', 'como funciona'],
@@ -111,6 +114,16 @@ function buildReply(question) {
   return 'Puedo orientarte sobre residuos reciclables, no reciclables y manejo responsable. Dame el material o ejemplo concreto, como botella, lata, carton, pila, aceite, ropa o tetrapack.'
 }
 
+function getRandomThinkingDelay() {
+  return Math.floor(Math.random() * (THINKING_DELAY_MAX_MS - THINKING_DELAY_MIN_MS + 1)) + THINKING_DELAY_MIN_MS
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
 export default function Chat() {
   const nextMessageId = useRef(2)
   const [messages, setMessages] = useState([
@@ -146,13 +159,15 @@ export default function Chat() {
     setMessages((current) => [...current, userMessage])
     setInput('')
     setIsSending(true)
+    const thinkingDelay = wait(getRandomThinkingDelay())
 
     try {
-      const response = await askChatbot(trimmed)
+      const [response] = await Promise.all([askChatbot(trimmed), thinkingDelay])
       const assistantMessage = createMessage('assistant', response.reply || buildReply(trimmed))
 
       setMessages((current) => [...current, assistantMessage])
     } catch {
+      await thinkingDelay
       const assistantMessage = createMessage('assistant', buildReply(trimmed))
 
       setMessages((current) => [...current, assistantMessage])

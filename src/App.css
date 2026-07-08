@@ -986,6 +986,66 @@
   }
 }
 
+@keyframes mobileDropGlow {
+  0%,
+  100% {
+    box-shadow: 0 10px 22px rgba(42, 125, 73, 0.07);
+    border-color: #457b9d;
+  }
+
+  50% {
+    box-shadow: 0 16px 34px rgba(42, 125, 73, 0.16);
+    border-color: #2a7d55;
+  }
+}
+
+@keyframes mobileChipIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes mobileButtonPulse {
+  0%,
+  100% {
+    box-shadow: 0 10px 22px rgba(28, 76, 42, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 16px 32px rgba(28, 76, 42, 0.34);
+  }
+}
+
+@keyframes mobileButtonSweep {
+  0%,
+  46% {
+    transform: translateX(-120%);
+  }
+
+  68%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes mobileThinkingPop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1122,6 +1182,7 @@
   .drop-zone {
     min-height: 250px;
     gap: 10px;
+    animation: mobileDropGlow 3.6s ease-in-out infinite;
   }
 
   .drop-zone svg {
@@ -1197,6 +1258,15 @@
     min-height: 42px;
     border-radius: 10px;
     text-align: left;
+    animation: mobileChipIn 0.38s ease both;
+  }
+
+  .chat-quick-actions button:nth-child(2) {
+    animation-delay: 70ms;
+  }
+
+  .chat-quick-actions button:nth-child(3) {
+    animation-delay: 140ms;
   }
 
   .trust-row {
@@ -1327,6 +1397,20 @@
     border-radius: 10px;
     font-size: 1rem;
     text-align: center;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    animation: mobileButtonPulse 3s ease-in-out infinite;
+  }
+
+  .primary-action::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(105deg, transparent 0 34%, rgba(255, 255, 255, 0.28) 48%, transparent 62% 100%);
+    transform: translateX(-120%);
+    animation: mobileButtonSweep 3.4s ease-in-out infinite;
   }
 
   .security-note {
@@ -1347,6 +1431,15 @@
   .chat-input-row input,
   .chat-input-row button {
     min-height: 48px;
+  }
+
+  .message--thinking {
+    animation: mobileThinkingPop 0.32s ease both;
+  }
+
+  .typing-dots span {
+    width: 6px;
+    height: 6px;
   }
 
   .chat-hint {
