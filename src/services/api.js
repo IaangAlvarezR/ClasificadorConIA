@@ -43,7 +43,7 @@ export async function askChatbot(question) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question: `${question}\n\nResponde breve y resumido, maximo 3 frases.` }),
     })
   } catch {
     throw new Error('No se pudo conectar con el asistente. Intenta de nuevo mas tarde.')

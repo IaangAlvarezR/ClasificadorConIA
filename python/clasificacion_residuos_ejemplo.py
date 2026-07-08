@@ -129,6 +129,10 @@ CHAT_REPLY_CACHE: dict[str, str] = {}
 LLM_DISABLED_UNTIL = 0.0
 
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "openai").lower()
+LLM_RETRY_COUNT = int(os.environ.get("LLM_RETRY_COUNT", "2"))
+LLM_RETRY_DELAY = float(os.environ.get("LLM_RETRY_DELAY", "1.5"))
+LLM_REQUEST_TIMEOUT = float(os.environ.get("LLM_REQUEST_TIMEOUT", "12"))
+LLM_MAX_OUTPUT_TOKENS = int(os.environ.get("LLM_MAX_OUTPUT_TOKENS", "96"))
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_MODEL = os.environ.get("GOOGLE_MODEL", "gemini-flash-lite-latest")
@@ -442,6 +446,7 @@ def get_openai_reply(question: str) -> str | None:
                 {"role": "user", "content": question},
             ],
             "temperature": 0.2,
+            "max_tokens": LLM_MAX_OUTPUT_TOKENS,
         }
         request = urllib.request.Request(
             "https://api.openai.com/v1/chat/completions",
@@ -478,51 +483,56 @@ def get_gemini_reply(question: str) -> str | None:
         ],
         "systemInstruction": {
             "parts": [
-                {
-                    "text": (
-                        "Responde unicamente sobre reciclaje, residuos y las clases del proyecto "
-                        "EcoClasifica IA. Nunca respondas fuera de ese contexto. Responde en espanol."
-                    )
-                }
-            ]
-        },
-        "generationConfig": {
-            "temperature": 0.2,
-            "maxOutputTokens": 256,
-            "candidateCount": 1,
-        },
+                    {
+                        "text": (
+                            "Responde unicamente sobre reciclaje, residuos y las clases del proyecto "
+                            "EcoClasifica IA. Nunca respondas fuera de ese contexto. Responde en espanol, "
+                            "en 1 a 3 frases cortas. Se directo, sin listas largas ni explicaciones extensas."
+                        )
+                    }
+                ]
+            },
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": LLM_MAX_OUTPUT_TOKENS,
+                "candidateCount": 1,
+            },
     }
     models_to_try = list(dict.fromkeys([GOOGLE_MODEL, *GOOGLE_FALLBACK_MODELS]))
     had_temporary_error = False
 
-    for model in models_to_try:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-            request = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": GOOGLE_API_KEY,
-                },
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=20) as response:
-                body = json.loads(response.read().decode("utf-8"))
-                candidates = body.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    text = "".join(part.get("text", "") for part in parts)
-                    return text.strip() or None
-        except urllib.error.HTTPError as error:
-            if error.code in {429, 500, 502, 503, 504}:
+    for attempt in range(LLM_RETRY_COUNT + 1):
+        for model in models_to_try:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                request = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": GOOGLE_API_KEY,
+                    },
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=LLM_REQUEST_TIMEOUT) as response:
+                    body = json.loads(response.read().decode("utf-8"))
+                    candidates = body.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        text = "".join(part.get("text", "") for part in parts)
+                        return text.strip() or None
+            except urllib.error.HTTPError as error:
+                if error.code in {429, 500, 502, 503, 504}:
+                    had_temporary_error = True
+                    continue
+                print(f"Error al consultar Gemini: {error}")
+                return None
+            except Exception as error:
                 had_temporary_error = True
-                continue
-            print(f"Error al consultar Gemini: {error}")
-            return None
-        except Exception as error:
-            print(f"Error al consultar Gemini: {error}")
-            return None
+                print(f"Error al consultar Gemini: {error}")
+
+        if attempt < LLM_RETRY_COUNT:
+            time.sleep(LLM_RETRY_DELAY)
 
     if had_temporary_error:
         return "__RATE_LIMIT__"
@@ -537,9 +547,7 @@ def get_chat_reply(question: str) -> str:
         return CHAT_REPLY_CACHE[normalized_question]
 
     if time.time() < LLM_DISABLED_UNTIL:
-        reply = build_local_reply(question)
-        CHAT_REPLY_CACHE[normalized_question] = reply
-        return reply
+        return build_local_reply(question)
 
     reply = None
     if LLM_PROVIDER == "google":
@@ -549,9 +557,9 @@ def get_chat_reply(question: str) -> str:
 
     if reply == "__RATE_LIMIT__":
         LLM_DISABLED_UNTIL = time.time() + 60
-        reply = build_local_reply(question)
+        return build_local_reply(question)
     elif reply is None:
-        reply = build_local_reply(question)
+        return build_local_reply(question)
 
     CHAT_REPLY_CACHE[normalized_question] = reply
     return reply

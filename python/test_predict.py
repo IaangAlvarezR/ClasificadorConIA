@@ -114,7 +114,7 @@ def test_get_gemini_reply_uses_generate_content(monkeypatch: pytest.MonkeyPatch)
     assert captured["url"].endswith("/v1beta/models/gemini-flash-lite-latest:generateContent")
     assert captured["headers"]["X-goog-api-key"] == "test-key"
     assert b"systemInstruction" in captured["body"]
-    assert captured["timeout"] == 20
+    assert captured["timeout"] == 12
 
 
 def test_predict_endpoint_rejects_corrupted_image() -> None:

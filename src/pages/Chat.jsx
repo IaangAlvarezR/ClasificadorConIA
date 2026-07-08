@@ -183,6 +183,21 @@ export default function Chat() {
               <p>{message.content}</p>
             </div>
           ))}
+          {isSending ? (
+            <div className="message message--assistant message--thinking">
+              <div className="message__icon" aria-hidden="true">
+                <Leaf size={16} />
+              </div>
+              <p>
+                EcoChat esta pensando
+                <span className="typing-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="chat-quick-actions">
