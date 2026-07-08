@@ -1,11 +1,24 @@
 import { Image, ShieldCheck, UploadCloud } from 'lucide-react'
 
-export default function UploadPanel({ previewUrl, selectedFile, isLoading, onFileSelect }) {
+export default function UploadPanel({ previewUrl, selectedFile, isLoading, error, onFileSelect }) {
   function handleChange(event) {
     const [file] = event.target.files
-    if (file) {
-      onFileSelect(file)
+    onFileSelect(file ?? null)
+    event.target.value = ''
+  }
+
+  function handleDragOver(event) {
+    event.preventDefault()
+  }
+
+  function handleDrop(event) {
+    event.preventDefault()
+    if (isLoading) {
+      return
     }
+
+    const [file] = event.dataTransfer.files
+    onFileSelect(file ?? null)
   }
 
   return (
@@ -21,10 +34,10 @@ export default function UploadPanel({ previewUrl, selectedFile, isLoading, onFil
       </div>
 
       <div className="panel__body">
-        <label className="drop-zone">
+        <label className="drop-zone" onDragOver={handleDragOver} onDrop={handleDrop}>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/jpg"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
             disabled={isLoading}
             onChange={handleChange}
           />
@@ -33,9 +46,15 @@ export default function UploadPanel({ previewUrl, selectedFile, isLoading, onFil
           <span>o haz clic para seleccionar</span>
           <small>
             <Image size={16} aria-hidden="true" />
-            Formatos permitidos: JPG, PNG, JPEG
+            Formatos permitidos: JPG, PNG, JPEG, WEBP
           </small>
         </label>
+
+        {error ? (
+          <p className="upload-error" role="alert">
+            {error}
+          </p>
+        ) : null}
 
         <div className="preview-block">
           <h3>Vista previa</h3>
@@ -59,7 +78,7 @@ export default function UploadPanel({ previewUrl, selectedFile, isLoading, onFil
           {isLoading ? 'Analizando imagen...' : 'Seleccionar imagen'}
           <input
             type="file"
-            accept="image/png,image/jpeg,image/jpg"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
             disabled={isLoading}
             onChange={handleChange}
           />

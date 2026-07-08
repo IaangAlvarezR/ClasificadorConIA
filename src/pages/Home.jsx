@@ -4,7 +4,35 @@ import Footer from '../components/Footer.jsx'
 import Header from '../components/Header.jsx'
 import ResultPanel from '../components/ResultPanel.jsx'
 import UploadPanel from '../components/UploadPanel.jsx'
+import Chat from './Chat.jsx'
 import { classifyImage } from '../services/api.js'
+
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+const ALLOWED_IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
+
+function validateImageFile(file) {
+  if (!file) {
+    return 'No se selecciono ninguna imagen. Elige un archivo JPG, PNG o WEBP para continuar.'
+  }
+
+  if (file.size === 0) {
+    return 'La imagen esta vacia. Selecciona un archivo con contenido para poder analizarlo.'
+  }
+
+  if (file.size > MAX_UPLOAD_SIZE) {
+    return 'La imagen supera el limite de 5 MB. Usa una imagen mas ligera e intenta de nuevo.'
+  }
+
+  const fileName = file.name.toLowerCase()
+  const hasAllowedExtension = ALLOWED_IMAGE_EXTENSIONS.some((extension) => fileName.endsWith(extension))
+
+  if (!ALLOWED_IMAGE_TYPES.has(file.type) && !hasAllowedExtension) {
+    return 'Formato no valido. Solo se aceptan imagenes JPG, JPEG, PNG o WEBP.'
+  }
+
+  return ''
+}
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState(null)
@@ -14,23 +42,40 @@ export default function Home() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl('')
-      setResult(null)
-      setError('')
-      return undefined
+    if (previewUrl) {
+      return () => URL.revokeObjectURL(previewUrl)
     }
 
-    const objectUrl = URL.createObjectURL(selectedFile)
-    setPreviewUrl(objectUrl)
-
-    return () => URL.revokeObjectURL(objectUrl)
-  }, [selectedFile])
+    return undefined
+  }, [previewUrl])
 
   async function handleFileSelect(file) {
-    setSelectedFile(file)
     setResult(null)
     setError('')
+
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setSelectedFile(null)
+      setPreviewUrl('')
+      setIsLoading(false)
+      setError(validationError)
+      return
+    }
+
+    let objectUrl
+
+    try {
+      objectUrl = URL.createObjectURL(file)
+    } catch {
+      setSelectedFile(null)
+      setPreviewUrl('')
+      setIsLoading(false)
+      setError('No se pudo crear la vista previa de la imagen. Intenta con otro archivo.')
+      return
+    }
+
+    setSelectedFile(file)
+    setPreviewUrl(objectUrl)
     setIsLoading(true)
 
     try {
@@ -69,9 +114,14 @@ export default function Home() {
             previewUrl={previewUrl}
             selectedFile={selectedFile}
             isLoading={isLoading}
+            error={error}
             onFileSelect={handleFileSelect}
           />
           <ResultPanel previewUrl={previewUrl} result={result} isLoading={isLoading} error={error} />
+        </section>
+
+        <section className="chat-section">
+          <Chat />
         </section>
       </main>
 
