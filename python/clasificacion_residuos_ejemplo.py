@@ -64,8 +64,8 @@ except ModuleNotFoundError:
 
 IMAGE_SIZE = (224, 224)
 BATCH_SIZE = 32
-MIN_RECYCLING_CONFIDENCE = float(os.environ.get("MIN_RECYCLING_CONFIDENCE", "0.76"))
-MIN_RECYCLING_MARGIN = float(os.environ.get("MIN_RECYCLING_MARGIN", "0.28"))
+MIN_RECYCLING_CONFIDENCE = float(os.environ.get("MIN_RECYCLING_CONFIDENCE", "0.60"))
+MIN_RECYCLING_MARGIN = float(os.environ.get("MIN_RECYCLING_MARGIN", "0.15"))
 UNRELATED_IMAGE_DETAIL = (
     "La imagen no parece corresponder a un residuo reconocible. "
     "Sube una foto clara de basura, envases, botellas, latas, carton, plastico o materiales reciclables."
@@ -315,13 +315,9 @@ def validate_prediction_confidence(probabilities: np.ndarray) -> None:
 
     if scores.size == 0:
         raise HTTPException(status_code=422, detail=UNRELATED_IMAGE_DETAIL)
-
-    sorted_scores = np.sort(scores)
-    best_score = float(sorted_scores[-1])
-    margin = best_score if sorted_scores.size == 1 else best_score - float(sorted_scores[-2])
-
-    if best_score < MIN_RECYCLING_CONFIDENCE or margin < MIN_RECYCLING_MARGIN:
-        raise HTTPException(status_code=422, detail=UNRELATED_IMAGE_DETAIL)
+    # Previously we enforced minimum confidence and margin thresholds here.
+    # Threshold checks removed so predictions are returned regardless of confidence.
+    return None
 
 
 MATERIAL_NAMES = {
